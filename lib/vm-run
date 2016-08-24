@@ -58,6 +58,7 @@ vm::run(){
     config::get "_uuid" "uuid"
     config::get "_utc" "utctime" "yes"
     config::get "_debug" "debug" "no"
+    config::get "_sound" "sound_device"
 
     # generate a uuid if we don't have one already
     if [ -z "${_uuid}" ]; then
@@ -78,6 +79,7 @@ vm::run(){
     util::log "guest" "${_name}" " [debug mode: ${_debug}]"
     util::log "guest" "${_name}" " [primary disk: ${_bootdisk}]"
     util::log "guest" "${_name}" " [primary disk dev: ${_bootdisk_dev}]"
+    util::log "guest" "${_name}" " [sound dev: ${_sound}]"
 
     # check basic settings
     if [ -z "${_cpu}" -o -z "${_memory}" -o -z "${_bootdisk}" ]; then
@@ -178,6 +180,7 @@ vm::run(){
     vm::bhyve_device_fbuf
     vm::bhyve_device_mouse
     vm::bhyve_device_console
+    vm::bhyve_device_sound
 
     vm::lock
     util::log "guest" "${_name}" "booting"
@@ -664,6 +667,7 @@ vm::bhyve_device_mouse(){
     fi
 }
 
+<<<<<<< 40f1b9ebe18cfdc7969fa87eaa5b75a3216c4b60
 # add virtio_console devices to the guest
 #
 # @modifies _devices _slot
@@ -689,6 +693,19 @@ vm::bhyve_device_console(){
 
     _devices="${_devices} -s ${_slot}:0,virtio-console${_dev_str}"
     _slot=$((_slot + 1))
+# add a sound device
+#
+vm::bhyve_device_sound(){
+    local _sound
+
+    [ ${VERSION_BSD} -lt 1100000 ] && return 1
+    config::get "_sound" "sound_device"
+
+    # add a sound device if enabled
+    if [ -n "$_sound" ]; then
+        _devices="${_devices} -s ${_slot}:0,hda,play=$_sound"
+        _slot=$((_slot + 1))
+    fi
 }
 
 # get any pci passthrough devices
