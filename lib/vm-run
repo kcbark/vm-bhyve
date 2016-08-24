@@ -179,7 +179,10 @@ vm::run(){
     vm::bhyve_device_passthru
     vm::bhyve_device_fbuf
     vm::bhyve_device_mouse
+<<<<<<< dfd01735a1bc0ec8f747749147a69829d144f67d
     vm::bhyve_device_console
+=======
+>>>>>>> Add support for HD Audio emulation[1]
     vm::bhyve_device_sound
 
     vm::lock
@@ -667,6 +670,7 @@ vm::bhyve_device_mouse(){
     fi
 }
 
+<<<<<<< dfd01735a1bc0ec8f747749147a69829d144f67d
 <<<<<<< 40f1b9ebe18cfdc7969fa87eaa5b75a3216c4b60
 # add virtio_console devices to the guest
 #
@@ -693,6 +697,8 @@ vm::bhyve_device_console(){
 
     _devices="${_devices} -s ${_slot}:0,virtio-console${_dev_str}"
     _slot=$((_slot + 1))
+=======
+>>>>>>> Add support for HD Audio emulation[1]
 # add a sound device
 #
 vm::bhyve_device_sound(){
