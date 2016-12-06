@@ -692,7 +692,7 @@ vm::bhyve_device_console(){
 
     _devices="${_devices} -s ${_slot}:0,virtio-console${_dev_str}"
     _slot=$((_slot + 1))
-
+}
 # add a sound device
 #
 vm::bhyve_device_sound(){
