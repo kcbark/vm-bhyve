@@ -4,65 +4,23 @@ Management system for FreeBSD bhyve virtual machines
 
 Some of the main features include:
 
-* Now with Windows/UEFI support as of v0.7.2!
+* Windows/UEFI support
 * Simple commands to create/start/stop bhyve instances
 * Simple configuration file format
-* Virtual switches supporting vlans & nat (no manual tap or bridge devices needed)
+* Virtual switches supporting vlans & automatic device creation
 * ZFS support
 * FreeBSD/NetBSD/OpenBSD/Linux guest support
 * Automatic assignment of console devices to access guest console
 * Integration with rc.d startup/shutdown
 * Guest reboot handling
 * Designed with multiple compute nodes + shared storage in mind (NFS/iSCSI/etc)
-* Multiple datastores (1.1 only)
+* Multiple datastores
 * VNC graphics & tmux support (1.1 only. See wiki for instructions)
 
 ##### See the GitHub wiki for more information and examples.
 
 For most users, I recommend using the version in ports (1.1+).
 Main development happens in the master branch on GitHub and it may contain broken or incomplete features.
-
-## IMPORTANT - Note for Linux/NetBSD & OpenBSD users moving from 0.9 to 0.10+
-
-The method of supporting these guests has been heavily changed in 0.10 to
-allow more flexibility. These guests will no longer boot without making changes
-to the configuration file. (Note the `vm configure guest` command can be used to open
-the guest configuration in your default editor)
-
-First of all, if you are using Linux, the guest configuration option needs to be changed to `linux`.
-For NetBSD & OpenBSD, the following configuration options should be set.
-
-    guest="generic"
-    loader="grub"
-
-Additionally, any grub commands needed to boot the guest (or the guest installer) need to also
-be added to the configuration file. Please look at the sample templates in 0.10+ for examples
-on how these variables are set. This is what the configuration for OpenBSD 5.9 looks like:
-
-    grub_install0="kopenbsd -h com0 /5.9/amd64/bsd.rd"
-    grub_install1="boot"
-    grub_run_partition="openbsd1"
-    grub_run0="kopenbsd -h com0 -r sd0a /bsd"
-    grub_run1="boot"
-
-The `grub_run_partition` option is not required. By default vm-bhyve will use `hd0,1`, which is correct
-in most cases. It's also possible to specify the correct device and partition directly in the grub commands:
-
-    grub_run0="kopenbsd -h com0 -r sd0a (hd0,openbsd1)/bsd"
-    grub_run1="boot"
-
-(However some guests such as Ubuntu will boot automatically, without any boot commands specified,
-if the correct partition is provided)
-
-The `boot` command does not need to be specified if you are running vm-bhyve-0.11 or newer.
-
-This of course means that it is now trivial to adjust these commands if needed, whereas in
-previous versions of vm-bhyve, they were hard-coded.
-
-`grub-bhyve` is always run on the guest console now, so is accessible via the `vm console guest`
-command. If boot commands are provided, we create a grub.cfg file in the guest directory and
-point `grub-bhyve` at it. (Please note this file is re-written on each boot and so if changes to
-the commands are required, it should be done in the main guest configuration file)
 
 ## Quick-Start
 
@@ -71,8 +29,8 @@ See the sections below for more in-depth details.
 
     1. pkg install vm-bhyve
     2. zfs create pool/vm
-    3. echo 'vm_enable="YES"' >> /etc/rc.conf
-    4. echo 'vm_dir="zfs:pool/vm"' >> /etc/rc.conf
+    3. sysrc vm_enable="YES"
+    4. sysrc vm_dir="zfs:pool/vm"
     5. vm init
     6. cp /usr/local/share/examples/vm-bhyve/* /mountpoint/for/pool/vm/.templates/
     7. vm switch create public
@@ -115,7 +73,7 @@ in mind that you won't get back to your terminal until the guest is fully shutdo
 
 ## Install
 
-Download the latest release from Github, or install `sysutils/vm-bhyve`
+Download the latest release from GitHub, or install `sysutils/vm-bhyve`
 
 To install, just run the following command inside the vm-bhyve source directory
 
@@ -124,11 +82,6 @@ To install, just run the following command inside the vm-bhyve source directory
 If you want to run guests other than FreeBSD, you will need the grub2-bhyve package;
 
     # pkg install grub2-bhyve
-
-Additionally, while not specifically required, dnsmasq can be used to provid DHCP services
-when vm-bhyve is configured to run NAT.
-
-    # pkg install dnsmasq
 
 ## Initial configuration
 
@@ -204,16 +157,6 @@ Obviously you will need to replace em0 here with the correct interface name on y
 
     # vm switch add public em0
 
-If you want to use NAT, do not add a physical interface to the switch, as the switch will be on the private
-side of the NAT network. Just enable NAT on the switch:
-
-    # vm switch nat public on
-
-This will automatically create a private network on the switch, and forward guest traffic
-via your default gateway. Please note that pf must be enabled in /etc/rc.conf for NAT functionality to work.
-Whilst not strictly required, dnsmasq can be used to provide DHCP services to guests on the NAT network.
-vm-bhyve will generate a sample dnsmasq.conf file which can be installed for this purpose.
-
 If you want guest traffic to be on a specific VLAN when leaving the host, specify a vlan number. To turn
 off vlans, just set the vlan number to 0:
 
@@ -288,7 +231,7 @@ is the number of seconds to wait between starting each one. 5 seconds is the rec
 although a longer delay is useful if you have disk intensive guests and don't want them all booting
 at the same time.
 
-There's also a command which opens a guest's confiuration file in your default text editor, allowing
+There's also a command which opens a guest's configuration file in your default text editor, allowing
 you to easily make changes to the configuration. Please note that changes only take effect after
 a full shutdown and restart of the guest
 
@@ -319,37 +262,13 @@ Restart your vm.
 
 ## Windows Support
 
-Windows has been very quickly tested as of version 0.7.2 (Using Server 2012R2).
-I see no reason why other versions supported by bhyve shouldn't work as the basic bhyve
-commands are all the same. Please note that you need FreeBSD 10.3 or 11-CURRENT for the UEFI support
-to be functional.
-
-As there is no VGA console, you must follow the instructions at 
-https://people.freebsd.org/~grehan/bhyve_uefi/windows_iso_repack.txt 
-to create an unattended installation ISO. This requires a few packages to be installed but
-is fairly straight forward if you follow the instructions carefully.
-
-You also need the UEFI firmware, which can be retrieved from
-http://people.freebsd.org/~grehan/bhyve_uefi/BHYVE_UEFI_20151002.fd
-and needs to be placed in `$vm_dir/.config/BHYVE_UEFI.fd`.
-
-Once you have an ISO capable of installing without user interaction, vm-bhyve works as normal.
-Just copy the ISO to `$vm_dir/.iso/`, then run the following to install:
-
-    # vm create -t windows -s 50G winguest
-    # vm install winguest mywiniso.iso
-
-Installation can take around 25 minutes. If you look in the vm-bhyve.log file in the virtual
-machines directory, you should see it reboot twice. After the second reboot (third run in total)
-the machine should boot into Windows. Access the Windows console using the `vm console winguest` command,
-then press `i` to get its IP address (It will use DHCP). You can then RDP to the guest.
-The default login details are Administrator and Test123.
+Please see the Windows section in the Wiki
 
 ## Autocomplete
 
 If you are using the default csh/tcsh shell built into FreeBSD, running the following command should allow
 autocomplete to work for all the currently supported functions. This is especially useful for viewing
-and completing guest & ISO file names. Please note that there's three ocurrances of '/path/to/vm' which
+and completing guest & ISO file names. Please note that there's three occurrences of '/path/to/vm' which
 need to be changed to the directory containing your virtual machines.
 
 To make the autocomplete features available permanently, add the following to your `$HOME/.cshrc` file. Then either

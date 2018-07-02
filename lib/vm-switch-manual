@@ -25,19 +25,23 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # for a manual switch the bridge interface should already exist
-# we just assign our description to existing interface so switch::id can find it
+# we just assign our description so it's visible in ifconfig
 #
 # @param string _name name of the switch
 #
 switch::manual::init(){
     local _name="$1"
-    local _id _bridge
+    local _bridge="$2"
 
     # get bridge
-    config::core::get "_bridge" "bridge_${_name}"
-    [ -z "${_bridge}" ] && return 1
+    if [ -z "${_bridge}" ]; then
+        config::core::get "_bridge" "bridge_${_name}"
+        [ -z "${_bridge}" ] && return 1
+    fi
 
-    ifconfig "${_bridge}" description "vm-${_name}" up >/dev/null 2>&1
+    # don't rename custom bridges. user can set this in rc.conf or just stick with bridgeX
+    ifconfig "${_bridge}" descr "vm-${_name}" group vm-switch up >/dev/null 2>&1
+    switch::set_viid "${_name}" "${_bridge}"
 }
 
 # show the configuration details for a manual switch
@@ -52,21 +56,20 @@ switch::manual::show(){
 
     config::core::get "_bridge" "bridge_${_name}"
     config::core::get "_priv" "private_${_name}" "no"
-    printf "${_format}" "${_name}" "manual" "${_bridge}" "n/a" "${_priv}" "n/a" "n/a" "n/a" "n/a"
+    printf "${_format}" "${_name}" "manual" "${_bridge}" "n/a" "${_priv}" "n/a" "n/a" "n/a"
 }
 
 # create a manual switch
 # we just assign our switch name to the existing bridge
 #
 switch::manual::create(){
-    local _exists
 
     # we need to have a bridge
     [ -z "${_bridge}" ] && util::err "you must specify a bridge to import when creating a manual switch"
 
     # check we can find this bridge on the system
-    _exists=$(ifconfig | grep "^${_bridge}: ")
-    [ -z "${_exists}" ] && util::err "${_bridge} does not appear to be a valid existing bridge"
+    ifconfig "${_bridge}" >/dev/null 2>&1
+    [ $? -eq 0 ] || util::err "${_bridge} does not appear to be a valid existing bridge"
 
     # store configuration
     config::core::set "switch_list" "${_switch}" "1"
@@ -76,7 +79,7 @@ switch::manual::create(){
     [ -n "${_priv}" ] && config::core::set "private_${_switch}" "${_priv}"
 
     # import
-    ifconfig "${_bridge}" description "vm-${_switch}" up
+    switch::manual::init "${_switch}" "${_bridge}"
 }
 
 # remove a manual switch
@@ -87,12 +90,12 @@ switch::manual::remove(){
     local _switch="$1"
     local _id
 
-    switch::standard::id "_id" "${_switch}"
+    switch::manual::id "_id" "${_switch}"
     [ -z "${_id}" ] && return 0
 
     # try to remove our description
-    ifconfig ${_id} description "" >/dev/null 2>&1
-    return 0
+    # viid stays but it's not worth the extra hassle to remove that
+    ifconfig ${_id} -descr -group vm-switch >/dev/null 2>&1
 }
 
 # add a new interface to this switch
@@ -124,4 +127,15 @@ switch::manual::remove_member(){
 #
 switch::manual::vlan(){
     util::err "manual switches and member interfaces should be configured using /etc/rc.conf"
+}
+
+# get id for a manual switch
+# in this case we need to return the bridge name
+#
+# @param string _var variable to put id into
+# @param string _switch switch name
+# @return 0 if switch id found
+#
+switch::manual::id(){
+    config::core::get "$1" "bridge_$2"
 }

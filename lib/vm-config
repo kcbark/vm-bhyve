@@ -93,7 +93,14 @@ config::set(){
     fi
 
     sysrc -inqf "${VM_DS_PATH}/${_name}/${_name}.conf" "${_key}=${_value}" >/dev/null 2>&1
-    return $?
+}
+
+# remove a value from guest config
+config::remove(){
+    local _name="$1"
+    local _key="$2"
+
+    sysrc -inxqf "${VM_DS_PATH}/${_name}/${_name}.conf" "${_key}" >/dev/null 2>&1
 }
 
 # load core configuration file
@@ -155,8 +162,6 @@ config::core::set(){
     else
         sysrc -inqf "${vm_dir}/.config/system.conf" "${_var}"="${_value}" >/dev/null 2>&1
     fi
-
-    return $?
 }
 
 # remove a value from core configuration
@@ -174,6 +179,4 @@ config::core::remove(){
     else
         sysrc -inxqf "${vm_dir}/.config/system.conf" ${_var} >/dev/null 2>&1
     fi
-
-    return $?
 }
